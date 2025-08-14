@@ -1,13 +1,17 @@
-// api/generate.js  — versão CommonJS estável p/ Vercel
+// api/generate.js — compatível com CommonJS e ESM + MOCK sem API key
 
-module.exports = async function (req, res) {
+async function handler(req, res) {
   try {
+    // Permite GET para healthcheck e POST para gerar
+    if (req.method === 'GET') {
+      return res.status(200).json({ ok: true, route: '/api/generate' });
+    }
     if (req.method !== 'POST') {
-      res.setHeader('Allow', 'POST');
+      res.setHeader('Allow', 'GET, POST');
       return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    // Em alguns casos raros, o body pode vir string — garante o parse:
+    // Body pode vir como string às vezes — parse defensivo
     let body = req.body;
     if (typeof body === 'string') {
       try { body = JSON.parse(body); } catch {}
@@ -20,30 +24,30 @@ module.exports = async function (req, res) {
 
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 
-    // ✅ Sem chave: retorna MOCK (deve funcionar agora SEM ERRO)
+    // 🔒 Sem API key → sempre devolve MOCK (para demo funcionar)
     if (!OPENAI_API_KEY) {
       const mock = (variant === 'premium')
         ? `PLANO PREMIUM CRIATIVAMENTE — 7 DIAS
-Dia 1: atividade detalhada alinhada ao objetivo "${objetivo}" (${tempo}/dia, nível ${nivel}).
-Dia 2: prática guiada no formato ${preferencia}.
-Dia 3: microprojeto criativo.
-Dia 4: estudo dirigido + aplicação prática.
+Dia 1: atividade alinhada ao objetivo "${objetivo}" (${tempo}/dia, nível ${nivel}).
+Dia 2: prática no formato ${preferencia}.
+Dia 3: microprojeto criativo focando ${foco}.
+Dia 4: estudo dirigido + aplicação.
 Dia 5: revisão com técnica Feynman.
-Dia 6: desafio criativo focando ${foco}.
-Dia 7: consolidação + plano de próximos passos.
-EXERCÍCIOS CRIATIVOS (3): variações temáticas e restrições formais.
+Dia 6: desafio criativo (variação e restrição).
+Dia 7: consolidação + próximos passos.
+EXERCÍCIOS CRIATIVOS (3): variações temáticas.
 REFLEXÕES (3): medos, alavancas, definição de “bom”.
-RECURSOS: livros/vídeos no formato ${preferencia}.
+RECURSOS: materiais no formato ${preferencia}.
 Mensagem final: consistência diária de ${tempo} vence intensidade esporádica.`
-        : `Dia 1: conteúdo em ${preferencia} focando ${foco}.
+        : `Dia 1: conteúdo em ${preferencia} com foco em ${foco}.
 Dia 2: prática guiada (nível ${nivel}) por ${tempo}.
-Dia 3: microprojeto ligado ao objetivo "${objetivo}".
+Dia 3: microprojeto ligado a "${objetivo}".
 Exercício Criativo: conecte 3 palavras aleatórias em 1 parágrafo.
 Pergunta Reflexiva: o que mais te trava e como reduzir 10% amanhã?`;
-      return res.status(200).json({ text: mock });
+      return res.status(200).json({ text: mock, mock: true });
     }
 
-    const system = `Você é a CriativaMente, especializada em criar planos personalizados de estudo,
+    const system = `Você é a CriativaMente, especializada em planos personalizados de estudo,
 exercícios criativos e reflexões de autoconhecimento. Escreva em PT-BR, tom motivador, claro e direto.`;
 
     const promptFree = `Dados do usuário:
@@ -81,18 +85,17 @@ SEÇÕES
 
 Formato: subtítulos em CAIXA ALTA, listas numeradas, tom acolhedor e objetivo, PT-BR.`;
 
-    const content = variant === 'premium' ? promptPremium : promptFree;
+    const content = (variant === 'premium') ? promptPremium : promptFree;
 
-    // Chamada OpenAI (Node 18 na Vercel já tem fetch nativo)
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
-        temperature: variant === 'premium' ? 0.65 : 0.7,
+        temperature: (variant === 'premium') ? 0.65 : 0.7,
         messages: [{ role: 'system', content: system }, { role: 'user', content }]
       })
     });
@@ -104,8 +107,12 @@ Formato: subtítulos em CAIXA ALTA, listas numeradas, tom acolhedor e objetivo, 
 
     const data = await r.json();
     const text = data?.choices?.[0]?.message?.content ?? '';
-    return res.status(200).json({ text });
+    return res.status(200).json({ text, mock: false });
   } catch (e) {
     return res.status(500).json({ error: 'Server error', detail: String(e) });
   }
-};
+}
+
+// Exporta compatível com CJS e ESM:
+module.exports = handler;
+export default handler;
