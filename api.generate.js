@@ -1,39 +1,52 @@
-export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+// api/generate.js  — versão CommonJS estável p/ Vercel
 
-  const { objetivo, tempo, nivel, preferencia, foco, variant } = req.body || {};
-  if (!objetivo || !tempo || !nivel || !preferencia || !foco) {
-    return res.status(400).json({ error: 'Campos incompletos' });
-  }
+module.exports = async function (req, res) {
+  try {
+    if (req.method !== 'POST') {
+      res.setHeader('Allow', 'POST');
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
 
-  // 🔒 se não houver API key, devolve um MOCK para demonstração (grátis)
-  const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
-  if (!OPENAI_API_KEY) {
-    const mock = (variant === 'premium')
-      ? `PLANO PREMIUM CRIATIVAMENTE — 7 DIAS
-Dia 1: ... (atividade detalhada alinhada ao seu objetivo "${objetivo}")
-Dia 2: ...
-Dia 3: ...
-Dia 4: ...
-Dia 5: ...
-Dia 6: ...
-Dia 7: ...
-EXERCÍCIOS CRIATIVOS (3): ...
-REFLEXÕES GUIADAS (3): ...
-RECURSOS: livros/vídeos conforme preferência (${preferencia}).
-Mensagem final: Você começa hoje com ${tempo}/dia. Consistência vence intensidade esporádica.`
-      : `Dia 1: atividade no formato ${preferencia} focando ${foco}.
+    // Em alguns casos raros, o body pode vir string — garante o parse:
+    let body = req.body;
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch {}
+    }
+
+    const { objetivo, tempo, nivel, preferencia, foco, variant } = body || {};
+    if (!objetivo || !tempo || !nivel || !preferencia || !foco) {
+      return res.status(400).json({ error: 'Campos incompletos' });
+    }
+
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+
+    // ✅ Sem chave: retorna MOCK (deve funcionar agora SEM ERRO)
+    if (!OPENAI_API_KEY) {
+      const mock = (variant === 'premium')
+        ? `PLANO PREMIUM CRIATIVAMENTE — 7 DIAS
+Dia 1: atividade detalhada alinhada ao objetivo "${objetivo}" (${tempo}/dia, nível ${nivel}).
+Dia 2: prática guiada no formato ${preferencia}.
+Dia 3: microprojeto criativo.
+Dia 4: estudo dirigido + aplicação prática.
+Dia 5: revisão com técnica Feynman.
+Dia 6: desafio criativo focando ${foco}.
+Dia 7: consolidação + plano de próximos passos.
+EXERCÍCIOS CRIATIVOS (3): variações temáticas e restrições formais.
+REFLEXÕES (3): medos, alavancas, definição de “bom”.
+RECURSOS: livros/vídeos no formato ${preferencia}.
+Mensagem final: consistência diária de ${tempo} vence intensidade esporádica.`
+        : `Dia 1: conteúdo em ${preferencia} focando ${foco}.
 Dia 2: prática guiada (nível ${nivel}) por ${tempo}.
-Dia 3: revisão e microprojeto ligado ao objetivo "${objetivo}".
-Exercício Criativo: conecte três palavras aleatórias em um parágrafo.
-Pergunta Reflexiva: o que te trava mais e como reduzir isso em 10% amanhã?`;
-    return res.status(200).json({ text: mock });
-  }
+Dia 3: microprojeto ligado ao objetivo "${objetivo}".
+Exercício Criativo: conecte 3 palavras aleatórias em 1 parágrafo.
+Pergunta Reflexiva: o que mais te trava e como reduzir 10% amanhã?`;
+      return res.status(200).json({ text: mock });
+    }
 
-  const system = `Você é a CriativaMente, especializada em planos personalizados de estudo,
+    const system = `Você é a CriativaMente, especializada em criar planos personalizados de estudo,
 exercícios criativos e reflexões de autoconhecimento. Escreva em PT-BR, tom motivador, claro e direto.`;
 
-  const promptFree = `Dados do usuário:
+    const promptFree = `Dados do usuário:
 - Objetivo: ${objetivo}
 - Tempo diário: ${tempo}
 - Nível: ${nivel}
@@ -47,7 +60,7 @@ Tarefa (GRATUITO):
 
 Formate com títulos: Dia 1, Dia 2, Dia 3, Exercício Criativo, Pergunta Reflexiva.`;
 
-  const promptPremium = `Dados do usuário:
+    const promptPremium = `Dados do usuário:
 - Objetivo: ${objetivo}
 - Tempo diário: ${tempo}
 - Nível: ${nivel}
@@ -68,23 +81,31 @@ SEÇÕES
 
 Formato: subtítulos em CAIXA ALTA, listas numeradas, tom acolhedor e objetivo, PT-BR.`;
 
-  const content = variant === 'premium' ? promptPremium : promptFree;
+    const content = variant === 'premium' ? promptPremium : promptFree;
 
-  try {
+    // Chamada OpenAI (Node 18 na Vercel já tem fetch nativo)
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         temperature: variant === 'premium' ? 0.65 : 0.7,
         messages: [{ role: 'system', content: system }, { role: 'user', content }]
       })
     });
-    if (!r.ok) { const txt = await r.text(); return res.status(500).json({ error: 'OpenAI error', detail: txt }); }
+
+    if (!r.ok) {
+      const txt = await r.text();
+      return res.status(500).json({ error: 'OpenAI error', detail: txt });
+    }
+
     const data = await r.json();
     const text = data?.choices?.[0]?.message?.content ?? '';
     return res.status(200).json({ text });
   } catch (e) {
     return res.status(500).json({ error: 'Server error', detail: String(e) });
   }
-      }
+};
