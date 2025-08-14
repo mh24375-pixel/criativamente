@@ -1,0 +1,31 @@
+<!doctype html><html lang="pt-BR"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>CriativaMente — Planos com IA</title>
+<link rel="stylesheet" href="style.css"/>
+</head><body>
+<header class="container"><h1>CriativaMente</h1>
+<p class="subtitle">Planos de estudo, exercícios criativos e reflexões — personalizados por IA.</p></header>
+<main class="container card">
+<form id="form"><div class="grid">
+<label>Objetivo de aprendizado<input name="objetivo" placeholder="Ex.: melhorar escrita criativa" required/></label>
+<label>Tempo diário disponível<input name="tempo" placeholder="Ex.: 1h" required/></label>
+<label>Nível atual<select name="nivel" required>
+<option value="iniciante">Iniciante</option><option value="intermediario">Intermediário</option><option value="avancado">Avançado</option>
+</select></label>
+<label>Formato preferido<select name="preferencia" required>
+<option value="leitura">Leitura</option><option value="video">Vídeo</option><option value="exercicios">Exercícios práticos</option>
+</select></label>
+<label>Foco<select name="foco" required>
+<option value="criatividade">Criatividade</option><option value="autoconhecimento">Autoconhecimento</option><option value="ambos">Ambos</option>
+</select></label></div>
+<div class="actions">
+<button id="btnFree" type="submit" data-mode="free">Gerar Plano Gratuito</button>
+<button id="btnPremium" type="button" data-mode="premium" class="secondary">Ver Premium (7 dias)</button>
+</div><p class="hint">Sem cadastro. Resultado imediato no gratuito.</p></form>
+<section id="output" class="output" hidden>
+<h2>Seu Plano</h2><div id="result" class="result"></div>
+<div class="actions"><button id="copy">Copiar</button>
+<a id="buy" class="secondary" href="#" target="_blank" rel="noopener">Quero o Premium</a></div>
+</section></main>
+<footer class="container muted"><small>© CriativaMente — feito com ❤ e IA</small></footer>
+<script src="app.js"></script></body></html>
